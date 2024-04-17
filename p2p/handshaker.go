@@ -1,7 +1,12 @@
 package p2p
 
-// HandshakeFunc ...?
-// 
-type HandshakeFunc func(any) error
+import "errors"
 
-func NOPHandshakeFunc(any) error { return nil }
+// ErrInvalidHandshake is returned if the handshake between
+// the local and reomte node could not be established.
+var ErrInvalidHandshake = errors.New("invalid handshake")
+
+// HandshakeFunc ...?
+type HandshakeFunc func(Peer) error
+
+func NOPHandshakeFunc(Peer) error { return nil }
