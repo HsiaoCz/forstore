@@ -10,3 +10,7 @@ var ErrInvalidHandshake = errors.New("invalid handshake")
 type HandshakeFunc func(Peer) error
 
 func NOPHandshakeFunc(Peer) error { return nil }
+
+type OnPeerFunc func(Peer) error
+
+func NOPOnPeerFunc(Peer) error { return errors.New("failed the onpeer func") }

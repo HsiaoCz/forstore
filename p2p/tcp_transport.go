@@ -23,15 +23,22 @@ func NewTCPPeer(conn net.Conn, outBound bool) *TCPPeer {
 	}
 }
 
+// Close implements the tcp networks
+func (p *TCPPeer) Close() error {
+	return p.conn.Close()
+}
+
 type TCPTransportOps struct {
 	ListenAddr    string
 	HandshakeFunc HandshakeFunc
 	Decoder       Decoder
+	OnPeer        OnPeerFunc
 }
 
 type TCPTransport struct {
 	TCPTransportOps
 	listener net.Listener
+	rpcch    chan RPC
 	mu       sync.RWMutex
 	peers    map[net.Addr]Peer
 }
@@ -39,7 +46,14 @@ type TCPTransport struct {
 func NewTCPTransport(opts TCPTransportOps) *TCPTransport {
 	return &TCPTransport{
 		TCPTransportOps: opts,
+		rpcch:           make(chan RPC),
 	}
+}
+
+// Consume implements the Transport interface,which will return read-only channel
+// for reading the incoming messages received from another peer in the network
+func (t *TCPTransport) Consume() <-chan RPC {
+	return t.rpcch
 }
 
 func (t *TCPTransport) ListenAndAccept() error {
@@ -65,25 +79,37 @@ func (t *TCPTransport) startAcceptLoop() {
 }
 
 func (t *TCPTransport) handleConn(conn net.Conn) {
-	peer := NewTCPPeer(conn, true)
-	if err := t.HandshakeFunc(peer); err != nil {
+	var err error
+
+	defer func() {
+		slog.Error("dropping peer connection", "err", err)
 		conn.Close()
+	}()
+
+	peer := NewTCPPeer(conn, true)
+	if err = t.HandshakeFunc(peer); err != nil {
 		slog.Error("TCP handshake error", "err", err)
 		return
 	}
-
-	// read loop
-	// msg := &Message{}
-	buf := make([]byte, 2000)
-	for {
-		n, err := conn.Read(buf)
-		if err != nil {
-			slog.Error("TCP read error", "err", err)
+	if t.OnPeer != nil {
+		if err = t.OnPeer(peer); err != nil {
+			slog.Error("on peer error", "err", err)
+			return
 		}
-		// if err := t.Decoder.Decode(conn, buf); err != nil {
-		// 	slog.Error("conn read error", "err", err)
-		// 	continue
+	}
+	// read loop
+	rpc := RPC{}
+	// buf := make([]byte, 2000)
+	for {
+		// n, err := conn.Read(buf)
+		// if err != nil {
+		// 	slog.Error("TCP read error", "err", err)
 		// }
-		fmt.Printf("message:%+v\n", buf[:n])
+		if err = t.Decoder.Decode(conn, &rpc); err != nil {
+			slog.Error("conn read error", "err", err)
+			continue
+		}
+		rpc.From = conn.RemoteAddr()
+		fmt.Printf("message:%+v\n", rpc)
 	}
 }
