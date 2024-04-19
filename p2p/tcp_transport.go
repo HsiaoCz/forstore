@@ -105,8 +105,12 @@ func (t *TCPTransport) handleConn(conn net.Conn) {
 		// if err != nil {
 		// 	slog.Error("TCP read error", "err", err)
 		// }
-		if err = t.Decoder.Decode(conn, &rpc); err != nil {
-			slog.Error("conn read error", "err", err)
+		err := t.Decoder.Decode(conn, &rpc)
+		if _, ok := err.(*net.OpError); ok {
+			return
+		}
+		if err != nil {
+			slog.Error("tcp connection read error", "err", err)
 			continue
 		}
 		rpc.From = conn.RemoteAddr()
