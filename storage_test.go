@@ -2,19 +2,33 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"testing"
 )
 
 func TestStore(t *testing.T) {
 	opts := StoreOpts{
-		PathTransformFunc: DefaultPathTransformFunc,
+		PathTransformFunc: CASPathTransformFunc,
 	}
 	s := NewStore(opts)
 
-	data := bytes.NewReader([]byte("some jpg bytes"))
+	data := []byte("some jpg bytes")
+	key := "moms_best_picture"
 
-	if err := s.WriteStream("myspecialpicture", data); err != nil {
+	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
 		t.Error(err)
+	}
+	r, err := s.read(key)
+	if err != nil {
+		t.Error(err)
+	}
+	b, err := io.ReadAll(r)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if string(b) != string(data) {
+		t.Errorf("want %s have %s", string(data), string(b))
 	}
 }
 
@@ -26,7 +40,22 @@ func TestPathTransformFunc(t *testing.T) {
 	if PathKey.PathName != expectedPathName {
 		t.Errorf("hava %s want %s", PathKey.PathName, expectedPathName)
 	}
-	if PathKey.Original != expectedOriginKey {
-		t.Errorf("have %s want %s", PathKey.Original, expectedOriginKey)
+	if PathKey.Filename != expectedOriginKey {
+		t.Errorf("have %s want %s", PathKey.Filename, expectedOriginKey)
+	}
+}
+
+func TestDeleteKey(t *testing.T) {
+	opts := StoreOpts{
+		PathTransformFunc: CASPathTransformFunc,
+	}
+	s := NewStore(opts)
+	key := "moms_best_picture"
+	data := []byte("some jpg bytes")
+	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
+		t.Error(err)
+	}
+	if err := s.Delete(key); err != nil {
+		t.Error(err)
 	}
 }
