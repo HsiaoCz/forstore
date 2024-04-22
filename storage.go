@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+const defaultRootFolderName = "HsiaoCzRootFolder"
+
 func CASPathTransformFunc(key string) PathKey {
 	hash := sha1.Sum([]byte(key)) // [20]byte ==> []byte==>[:]
 	hashStr := hex.EncodeToString(hash[:])
@@ -33,7 +35,10 @@ func CASPathTransformFunc(key string) PathKey {
 type PathTransformFunc func(string) PathKey
 
 var DefaultPathTransformFunc = func(key string) PathKey {
-	return PathKey{}
+	return PathKey{
+		PathName: key,
+		Filename: key,
+	}
 }
 
 type PathKey struct {
@@ -45,7 +50,18 @@ func (p PathKey) FullPath() string {
 	return fmt.Sprintf("%s%s", p.PathName, p.Filename)
 }
 
+func (p PathKey) FirstPathName() string {
+	paths := strings.Split(p.PathName, "/")
+	if len(paths) == 0 {
+		return ""
+	}
+	return paths[0]
+}
+
 type StoreOpts struct {
+	// Root is the folder name of the root, containing all
+	// the files/dolders of the system
+	Root              string
 	PathTransformFunc PathTransformFunc
 }
 
@@ -54,6 +70,12 @@ type Store struct {
 }
 
 func NewStore(opts StoreOpts) *Store {
+	if opts.PathTransformFunc == nil {
+		opts.PathTransformFunc = DefaultPathTransformFunc
+	}
+	if len(opts.Root) == 0 {
+		opts.Root = defaultRootFolderName
+	}
 	return &Store{
 		StoreOpts: opts,
 	}
@@ -78,7 +100,7 @@ func (s *Store) readStream(key string) (io.ReadCloser, error) {
 func (s *Store) writeStream(key string, r io.Reader) error {
 	pathkey := s.PathTransformFunc(key)
 
-	if err := os.MkdirAll(pathkey.PathName, os.ModePerm); err != nil {
+	if err := os.MkdirAll(s.Root+"/"+pathkey.PathName, os.ModePerm); err != nil {
 		return err
 	}
 
@@ -103,7 +125,7 @@ func (s *Store) Delete(key string) error {
 		log.Printf("delete [%s] from disk", pathKey.FullPath())
 	}()
 
-	return os.RemoveAll(pathKey.FullPath())
+	return os.RemoveAll(pathKey.FirstPathName())
 }
 
 func (s *Store) Has(key string) bool {
