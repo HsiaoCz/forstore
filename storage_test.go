@@ -7,14 +7,27 @@ import (
 	"testing"
 )
 
-func TestStore(t *testing.T) {
+func newStore() *Store {
 	opts := StoreOpts{
 		PathTransformFunc: CASPathTransformFunc,
 	}
-	s := NewStore(opts)
+	return NewStore(opts)
+}
+
+func teardown(t *testing.T, s *Store) {
+	if err := s.Clear(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStore(t *testing.T) {
+
+	s := newStore()
+
+	defer teardown(t, s)
 
 	data := []byte("some jpg bytes")
-	key := "moms_best_picture"
+	key := "fooanbar"
 
 	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
 		t.Error(err)
@@ -39,7 +52,7 @@ func TestStore(t *testing.T) {
 }
 
 func TestPathTransformFunc(t *testing.T) {
-	key := "moms_best_picture"
+	key := "fooandbar"
 	PathKey := CASPathTransformFunc(key)
 	expectedOriginKey := "841e17de0d42f33b85acdb9ede1a47bfa8b9ef9f"
 	expectedPathName := "841e1/7de0d/42f33/b85ac/db9ed/e1a47/bfa8b/9ef9f"

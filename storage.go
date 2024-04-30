@@ -81,6 +81,10 @@ func NewStore(opts StoreOpts) *Store {
 	}
 }
 
+func (s *Store) Clear() error {
+	return os.RemoveAll(s.Root)
+}
+
 func (s *Store) read(key string) (io.Reader, error) {
 	f, err := s.readStream(key)
 	if err != nil {
