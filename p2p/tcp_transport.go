@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -51,6 +52,12 @@ func NewTCPTransport(opts TCPTransportOps) *TCPTransport {
 	}
 }
 
+// Close implements the Transport interface
+
+func (t *TCPTransport) Close() error {
+	return t.listener.Close()
+}
+
 // Consume implements the Transport interface,which will return read-only channel
 // for reading the incoming messages received from another peer in the network
 func (t *TCPTransport) Consume() <-chan RPC {
@@ -73,6 +80,9 @@ func (t *TCPTransport) ListenAndAccept() error {
 func (t *TCPTransport) startAcceptLoop() {
 	for {
 		conn, err := t.listener.Accept()
+		if errors.Is(err, net.ErrClosed) {
+			return
+		}
 		if err != nil {
 			slog.Error("TCP accept error", "err", err)
 		}
