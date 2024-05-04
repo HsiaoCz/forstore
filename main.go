@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"log"
 
 	"github.com/HsiaoCz/forstore/p2p"
@@ -30,7 +31,7 @@ import (
 // }
 
 func main() {
-	s1 := makeServer(":3000", ":4000")
+	s1 := makeServer(":3000", "")
 	s2 := makeServer(":4000", ":3000")
 	go func() {
 		if err := s1.Start(); err != nil {
@@ -41,6 +42,10 @@ func main() {
 	if err := s2.Start(); err != nil {
 		log.Fatal(err)
 	}
+
+	data := bytes.NewReader([]byte("my big data file here"))
+
+	s2.StoreData("key", data)
 }
 
 func makeServer(listenAddr string, nodes ...string) *FileServer {
