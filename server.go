@@ -49,7 +49,7 @@ type Payload struct {
 	Data []byte
 }
 
-func (s *FileServer) broadcast(p Payload) error {
+func (s *FileServer) broadcast(p *Payload) error {
 	// buf := new(bytes.Buffer)
 	// for _, peer := range s.peers {
 	// 	if err := gob.NewEncoder(buf).Encode(p); err != nil {
@@ -70,20 +70,27 @@ func (s *FileServer) StoreData(key string, r io.Reader) error {
 	// 1. store the file to disk
 	// 2. broadcast this file to all konwn peers in the network
 
-	if err := s.store.Write(key, r); err != nil {
+	buf := new(bytes.Buffer)
+	tee := io.TeeReader(r, buf)
+
+	if err := s.store.Write(key, tee); err != nil {
 		return err
 	}
 
 	// the reader is empty
-	buf := new(bytes.Buffer)
-	_, err := io.Copy(buf, r)
-	if err != nil {
-		return err
+	// _, err := io.Copy(buf, r)
+	// if err != nil {
+	// 	return err
+	// }
+
+	p := &Payload{
+		Key:  key,
+		Data: buf.Bytes(),
 	}
 
 	fmt.Println(buf.Bytes())
 
-	return nil
+	return s.broadcast(p)
 }
 
 func (s *FileServer) OnPeer(p p2p.Peer) error {
@@ -132,7 +139,11 @@ func (s *FileServer) loop() {
 	for {
 		select {
 		case msg := <-s.Transport.Consume():
-			fmt.Println(msg)
+			var p Payload
+			if err := gob.NewDecoder(bytes.NewReader(msg.Payload)).Decode(&p); err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("%+v\n", p)
 		case <-s.quitch:
 			return
 		}
